@@ -1,0 +1,80 @@
+/*-- scss:defaults --*/
+$theme-yellow: #C7C700;
+$theme-purple: #4B0DFB;
+$theme-lightgreen: #73DF93;
+$theme-red: #FF0700;
+$theme-midgreen: #009970;
+$theme-orange: #E39F0B;
+$theme-shockgreen: #6CFA00;
+$theme-blue: #0A04D4;
+$theme-lightcyan: #0BE3E2;
+$theme-darkcyan: #0095A8;
+$theme-cream: #F0F1EB; /* bakbrunnsfargen */
+$theme-darkred: #842948;
+$theme-stortingscrape: #FBEFC4;
+
+/*-- scss:rules --*/
+
+.stortingscrape {
+  color: $theme-stortingscrape;
+  font-weight: bold;
+}
+
+.yellow {
+  color: $theme-yellow;
+  font-weight: bold;
+}
+
+.purple {
+  color: $theme-purple;
+  font-weight: bold;
+}
+
+.lightgreen {
+  color: $theme-lightgreen;
+  font-weight: bold;
+}
+
+.red {
+  color: $theme-red;
+  font-weight: bold;
+}
+
+.midgreen {
+  color: $theme-midgreen;
+  font-weight: bold;
+}
+
+.orange {
+  color: $theme-orange;
+  font-weight: bold;
+}
+
+.shockgreen {
+  color: $theme-shockgreen;
+  font-weight: bold;
+}
+
+.blue {
+  color: $theme-blue;
+  font-weight: bold;
+}
+
+.lightcyan {
+  color: $theme-lightcyan;
+  font-weight: bold;
+}
+
+.darkcyan {
+  color: $theme-darkcyan;
+  font-weight: bold;
+}
+
+.darkred {
+  color: $theme-darkred;
+  font-weight: bold;
+}
+
+.smalltext {
+  font-size: 12px;
+}

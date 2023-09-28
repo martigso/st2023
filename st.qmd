@@ -1,0 +1,637 @@
+---
+title: "stortingscrape"
+subtitle: "Analyser av stortingsdata `r emo::ji('monocle')`"
+institute: "\\<martin.soyland@stv.uio.no\\>"
+author:
+  - name: "Martin Søyland"
+    affiliation: University of Oslo
+date: today
+date-format: iso
+format: 
+  revealjs:
+    theme: [serif, style.scss]
+    incremental: true
+    logo: figs/uio-logo.png
+    transition: zoom
+    transition-speed: slow
+    embed-resources: true
+filters:
+  - code-fullscreen
+bibliography: refbib.bib
+engine: knitr 
+
+---
+
+
+```{r}
+#| include: false
+
+library(stortingscrape)
+library(dplyr)
+library(tidytext)
+library(quanteda)
+library(stringr)
+library(DT)
+quanteda_options("print_dfm_max_ndoc" = 10)
+```
+
+# Følg presentasjonen
+
+
+
+# { data-background="figs/uio_page2.png" background-size="90%" background-position="50% 50%"}
+
+# [Hva gjør jeg?]{.midgreen}`r emo::ji("mag")` { data-background="./figs/tad_fig2.png" data-background-size=65% data-background-position="50% 70%"}
+
+[@Gilardi2018]{.smalltext}</br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br> 
+
+
+
+#  {data-background="https://github.com/martigso/stortingscrape/blob/master/man/figures/stortingscrape.png?raw=true" data-background-size=20%}
+
+
+## Installér! { auto-animate="true" .smaller}
+
+</br>
+
+:::: {.columns}
+
+::: {.column width="65%"}
+
+
+```{r}
+#| label: stortingscrape_install
+#| eval: false
+#| echo: true
+
+# CRAN
+install.packages("stortingscrape")
+
+# Utviklerversjon
+devtools::install_github("martigso/stortingscrape")
+
+```
+
+![](figs/ss2.png){width="65%"}
+
+
+:::
+
+::: {.column width="25%" }
+
+```{r}
+#| eval: false
+#| echo: false
+library(qrcode)
+png("figs/ss_qrcode.png")
+qr_code("https://martigso.github.io/stortingscrape/functions") |>
+  plot()
+dev.off()
+```
+
+</br></br></br>
+
+
+[Alle funksjoner:]{.darkred}
+![](figs/ss_qrcode.png){width="90%"}
+
+:::
+
+::::
+
+## [Kildekode]{.midgreen} { data-background="figs/xml2.png" data-background-size=50% data-background-position="70% 50%" .smaller}
+
+
+. . .
+
+
+```{r}
+#| label: ss_source
+#| echo: true
+#| eval: false
+
+get_session_mp_speech_activity <- function(sessionid = NA, mp_id = NA, good_manners = 0){
+
+  url <- paste0(
+    "https://data.stortinget.no/eksport/representanttaleaktiviteter?personid=", 
+    mp_id, "&sesjonid=", sessionid)
+
+  base <- GET(url)
+
+  resp <- http_type(base)
+  if(resp != "text/xml") stop(paste0("Response of ", url, " is not text/xml."), call. = FALSE)
+
+  status <- http_status(base)
+  if(status$category != "Success") stop(paste0("Response of ", url, " returned as '", status$message, "'"), call. = FALSE)
+
+  tmp <- read_html(base)
+
+  tmp2 <- data.frame(response_date      = tmp |> html_elements("representant_tale_aktivitet_oversikt > respons_dato_tid") |> html_text(),
+                     version            = tmp |> html_elements("representant_tale_aktivitet_oversikt > versjon") |> html_text(),
+                     session_id         = tmp |> html_elements("representant_tale_aktivitet_oversikt > sesjon_id") |> html_text(),
+                     agenda_case_number = tmp |> html_elements("representant_tale_aktivitet > dagsorden_sak_nummer") |> html_text(),
+                     meeting_id         = tmp |> html_elements("representant_tale_aktivitet > mote_id") |> html_text(),
+                     speech_start_time  = tmp |> html_elements("representant_tale_aktivitet > tale_start_tid") |> html_text(),
+                     speech_type        = tmp |> html_elements("representant_tale_aktivitet > tale_type") |> html_text(),
+                     speech_length_secs = tmp |> html_elements("representant_tale_aktivitet > tale_varighet_sekunder") |> html_text())
+
+  Sys.sleep(good_manners)
+
+  return(tmp2)
+
+}
+
+```
+
+## Fetch data!
+
+```{r}
+#| label: jgs_activity
+#| echo: true
+#| eval: false
+library(stortingscrape)
+
+jgs_activity <- get_session_mp_speech_activity("2022-2023", "JGS")
+```
+
+. . .
+
+```{r}
+#| echo: false
+#| eval: true
+load("data/jgs_activity.rda")
+set.seed(85932)
+jgs_activity |>  
+  mutate(mins = as.numeric(speech_length_secs) %/% 60,
+         secs = as.numeric(speech_length_secs) %% 60,
+         min_sec = str_c(mins, "min. ", secs, "sek."),
+         min_sec = ifelse(str_detect(min_sec, "^0min"),
+                          str_c(secs, "sek."),
+                          min_sec)) |> 
+  select(`Møte` = meeting_id, 
+         `Sak nr.` = agenda_case_number, 
+         `Start` = speech_start_time, 
+         `Tid` = min_sec, 
+         `Type` = speech_type) |>  
+  group_by(Type) |>  
+  slice_sample(n = 2) |> 
+  kableExtra::kable() |>  
+  kableExtra::kable_styling(font_size = "22")
+```
+
+## 
+
+
+:::: {.columns}
+
+::: {.column width="50%" .fragment}
+
+```{r}
+#| eval: true
+#| fig-height: 8
+#| fig-width: 6
+library(ggplot2)
+
+jgs_activity |>
+  subset(x = _, speech_type == "MSPT_TILSVA" | speech_type == "MSPT_SVAR") |>
+  ggplot(aes(x = as.numeric(speech_length_secs))) +
+  geom_histogram(fill = "darkcyan") +
+  facet_wrap(~ speech_type, nrow = 2) +
+  scale_x_continuous(breaks = seq(0, 180, 20)) +
+  theme_classic() +
+  labs(y = "Frekvens", x = "Taletid (sekunder)") +
+  theme(plot.background = element_rect(fill = "#F0F1EB", color = "#F0F1EB"),
+        panel.background = element_rect(fill = "#F0F1EB"),
+        strip.background = element_rect(fill = "#F0F1EB"))
+
+```
+
+:::
+
+::: {.column width="50%" .fragment}
+
+```{r}
+#| eval: false
+#| echo: true
+get_mp_pic("JGS", show_plot = T)
+```
+
+![](figs/jgs.png){width="87%"}
+
+:::
+
+
+::::
+
+# Preprosessering: `Talk of Norway`
+
+
+[@Lapponi2018]{.blue}
+
+## `Oslo-Bergen tagger` { .smaller }
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+> Domenetap, at norsk blir erstattet av engelsk innenfor et spesielt område, er ofte sett på som en av de store truslene mot den norske språkutviklingen. De klassiske eksemplene på dette er transnasjonale selskaper som tar i bruk engelsk på arbeidsplassen, og innenfor utdanningssektoren hvor f.eks. høyere utdanning foregår på engelsk.
+
+```{r}
+#| label: obt_sample
+#| echo: false
+#| eval: true
+obt_sample <- system.file(package = "stortingscrape", "extdata/obt_sample.txt")
+
+```
+
+:::
+
+::: {.column width="50%".fragment}
+
+```{r}
+#| label: read_obt
+#| echo: false
+library(stortingscrape)
+
+read_obt(obt_sample) |>
+  subset(x = _, select = 2:6) |> 
+  datatable(options = list(dom = "t", pageLength = 15),
+            rownames = FALSE) |> 
+  formatStyle(columns = 0:3, `font-size` = '12px') |> 
+  formatStyle(0:35,
+              target = "row",
+              `font-size` = '12px')
+
+```
+
+:::
+
+::::
+
+## 
+
+:::: {.columns}
+::: {.column width="45%"}
+![](figs/pos_showcase2.png){width=75%} 
+:::
+::: {.column width="45%" .fragment}
+![](figs/pos_showcase.png){width=75%}
+:::
+::: {.column width="10%" .fragment}
+</br></br></br>
+[SP]{.midgreen}
+</br></br></br></br></br></br>
+[SV]{.darkred}
+:::
+::::
+
+##
+
+![](figs/f1_ton2.png){width=95%}
+
+
+
+# Sentiment: `Spørsmål i Stortinget`
+
+<span style="font-size:12pt">@Bjoerkholt2022</span>
+
+```{r}
+library(word2vec)
+library(NorSentLex)
+load("../../storting/papers/question_sentiment/data/w2v/w2v_sentiment_dictionary.rda")
+w2v_model <- read.word2vec("../../storting/papers/question_sentiment/data/w2v/w2v_model.bin")
+
+```
+
+## Bakteppe
+
+</br>
+
+> [W]hy would a party [...] invest in oversight activities? The reason [...] is that an opposition party will pursue electoral and ofﬁce goals, and these goals can be achieved through engaging in executive oversight. \
+ <font size="2"> @Whitaker2021</font>
+
+. . .
+
+@Barnes2019 `NorSentLex`
+
+```{r}
+#| echo: true
+NorSentLex::nor_fullform_sent$negative |> length()
+NorSentLex::nor_fullform_sent$positive |> length()
+```
+
+
+## w2v-ordbok {.smaller}
+
+:::: {.columns}
+
+::: {.column}
+
+```{r}
+#| label: w2v_dictionary
+#| message: false
+#| error: false
+#| eval: true
+
+library(DT)
+
+sent_est |>
+  arrange(sent) |>
+  select(Token = term1, sent) |>
+  mutate(sent = round(sent, 2)) |>
+  datatable(style = "bootstrap", 
+            options = list(dom = "t", pageLength = 12),
+            rownames = FALSE) |>
+  DT::formatStyle(columns = 0:3,
+                  color = "black",
+                  `font-size` = "14pt") |>
+  DT::formatStyle(0:148,
+                  target = "row",
+                  color = "black",
+                  `font-size` = "14pt")
+```
+
+:::
+
+::: {.column}
+
+```{r}
+#| label: w2v_dictionary2
+#| message: false
+#| error: false
+#| eval: true
+
+library(DT)
+
+sent_est |>
+  arrange(desc(sent)) |>
+  select(Token = term1, sent) |>
+  mutate(sent = round(sent, 2)) |>
+  datatable(style = "bootstrap", 
+            options = list(dom = "t", pageLength = 12),
+            rownames = FALSE) |>
+  DT::formatStyle(columns = 0:3,
+                  color = "black",
+                  `font-size` = "14pt") |>
+  DT::formatStyle(0:148,
+                  target = "row",
+                  color = "black",
+                  `font-size` = "14pt")
+```
+
+
+:::
+
+
+::::
+
+## { data-background="figs/sent_vitass.png" data-background-size="70%" }
+
+
+
+# NER: `Representasjon i spørsmål`
+
+[@Soeyland2022]{.smaller}
+
+
+## Bakgrunn
+
+Eirin Sund (Arbeiderpartiet, 2014-05-20):
+
+> Vi snakker her om foreldre, altså mødre og fedre, som ønsker å delta i sine
+  barns aktiviteter, som f.eks. en
+  <span style="font-weight:bold;color: #067342">fotballturnering</span>. Du kan
+  ikke komme deg fra <span style="font-weight:bold;color: #ff0000">Ålgård</span>
+  til <span style="font-weight:bold;color: #ff0000">Kverneland</span>, det går
+  ikke buss
+
+## [Hvorfor?]{.darkcyan} { data-background="figs/meg.jpg" data-background-size=65% }
+
+
+## NER matching
+
+```{r}
+#| label: ner_spacy
+#| echo: true
+#| eval: true
+library(dplyr)
+library(spacyr);spacy_initialize("nb_core_news_lg")
+
+text <- readLines("data/ex_text.txt")
+
+tmp <- spacy_parse(text,
+                   pos = TRUE,
+                   tag = FALSE,
+                   lemma = TRUE,
+                   entity = TRUE,
+                   dependency = FALSE,
+                   nounphrase = FALSE,
+                   multithread = FALSE)
+
+```
+
+
+. . .
+
+> <span style="font-weight:bold;color: red">Warning message</span>: In spacy_parse.character(text, pos = TRUE, tag = FALSE,
+  lemma = TRUE,:lemmatization may not work properly in model 'nb_core_news_lg'
+
+
+
+## NER matching
+
+</br>
+
+```{r}
+tmp[26:40, ] |> 
+  kableExtra::kable() |> 
+  kableExtra::kable_styling(font_size = "20") |> 
+  kableExtra::row_spec(c(7, 9), bold = T, color = "white", background = "#E39F0B")
+
+```
+
+## Resultat { data-background="figs/q_type_effects2.png" data-background-size="50%" data-background-position="50% 70%"}
+
+
+
+<!-- # Klassifisering: `Polarisering?` -->
+
+<!-- <span style="font-size:12pt">@Soeyland2020</span> -->
+
+
+
+<!-- ## Polarisering -->
+
+<!-- </br> -->
+
+<!-- @Peterson2018: -->
+
+<!-- > [W]e understand 'polarization' to mean the (average) difference between the -->
+<!--   positions of the two main parties who have held Prime Ministerial office  -->
+<!--   in modern times. -->
+
+<!-- ## Folds -->
+
+<!-- ```{r} -->
+<!-- #| eval: false -->
+<!-- #| echo: true -->
+<!-- library(readr) -->
+<!-- library(tonR) -->
+<!-- library(dplyr) -->
+
+<!-- set.seed(4753) -->
+
+<!-- meta <- read_csv("../../gitDebates/talk-of-norway/data/ton_updated.csv") |>  -->
+<!--   filter(speaker_role == "Representant") |>  -->
+<!--   filter(party_id %in% c("A", "FrP", "H", "KrF", "Sp", "SV", "V")) |>  -->
+<!--   select(id, session, party_id) -->
+
+<!-- sessions <- sort(unique(meta$session)) -->
+
+
+<!-- for(i in 1:length(sessions)){ -->
+
+<!--   tmp <- meta[which(meta$session == sessions[i]), ] -->
+
+<!--   # Giving all rows in tmp a random fold from 0 to 9 -->
+<!--   tmp$fold <- sample(paste0("fold", 0:9), nrow(tmp), replace = TRUE) -->
+
+<!--   # Making train/test for each fold, where fold x is test, and -->
+<!--   # everything else is train -->
+<!--   lapply(sort(unique(tmp$fold)), function(x){ -->
+<!--     test <- tmp[which(tmp$fold == x), ] -->
+<!--     train <- tmp[which(tmp$fold != x), ] -->
+
+<!--     writeLines(test$id, con = paste0("data/folds/", sessions[i], "/test/", x, ".txt")) -->
+<!--     writeLines(train$id, con = paste0("data/folds/", sessions[i], "/train/", x, ".txt")) -->
+<!--   }) -->
+<!-- } -->
+
+<!-- ``` -->
+
+
+<!-- ## Stochastic Gradient Boost -->
+
+<!-- ```{r} -->
+<!-- #| label: klassif_eks -->
+<!-- #| eval: false -->
+<!-- #| echo: true -->
+<!-- library(caret) -->
+
+<!-- # Train control -->
+<!-- tr <- trainControl(method = "none",     # only fits one model to the training set -->
+<!--                    classProbs = TRUE,   # keep class probs. -->
+<!--                    verboseIter = TRUE)  # show iteration info -->
+
+<!-- # Tuning grid (see http://topepo.github.io/caret/available-models.html) -->
+<!-- tg <- expand.grid(n.trees = c(100),          # Boosting Iterations -->
+<!--                   interaction.depth = c(2),  # Max Tree Depth -->
+<!--                   shrinkage = 0.01,          # Shrinkage -->
+<!--                   n.minobsinnode = 10)       # Min. Terminal Node Size -->
+
+<!-- # Class weights -->
+<!-- wt <- nrow(ton_train) / (length(unique(ton_train$party_id)) * table(ton_train$party_id)) -->
+
+
+<!-- wt <- wt[match(ton_train$party_id, names(wt))] -->
+
+<!-- tmp_grid <- train(party_id ~ ., data = ton_train, -->
+<!--                   method = "gbm",  -->
+<!--                   trControl = tr, -->
+<!--                   tuneGrid = tg, -->
+<!--                   weights = wt) -->
+<!-- ``` -->
+
+<!-- ## Intrapartisammenheng -->
+
+<!-- ![](./figs/party_f1_boot.png) -->
+
+
+<!-- ## Interpartirelasjoner -->
+
+<!-- ![](./figs/sv_closeness.png) -->
+
+<!-- ## Begge deler?  -->
+
+<!-- ![](./figs/frp_roadtoll.png) -->
+
+# Emnemodellering: `Eksterne sjokk`
+
+<span style="font-size:12pt">@Finseraas2021</span>
+
+## [Preprosessering]{.purple} {.smaller}
+
+
+```{r}
+#| label: exschok_preproc
+#| file: src/ex_shock_prepros.R
+#| eval: false
+#| echo: true
+
+
+
+```
+
+
+
+##
+
+```{r}
+#| label: oil_show_dfm
+#| echo: false
+load("~/Dropbox/PhD/Storting/Papers/Oil/oljesjokk/data/preprocess/reps_preproc_bigram_pos_com.rda")
+
+as.matrix(lemma_counts[1:10, 100:103])
+```
+
+. . .
+
+</br></br>
+
+```{r}
+#| class-output: .darkcyan
+cat("\rAntall taler:", dim(lemma_counts)[1], "\r\nUnike ord:", dim(lemma_counts)[2])
+```
+
+## [Kart!]{.blue} {.smaller}
+
+</br></br>
+
+::::{.columns}
+
+:::{.column width=33% .fragment}
+
+![](figs/map28.png){width=85%}
+
+[Arbeidsledighet]{.darkcyan}
+
+:::
+
+:::{.column width=33% .fragment}
+
+![](figs/map55.png){width=85%}
+
+[Fornybar vs. olje]{.orange}
+
+:::
+
+:::{.column width=33% .fragment}
+
+![](figs/map11.png){width=85%}
+
+[Grønne skiftet]{.midgreen}
+
+:::
+
+::::
+
+
+
+# Referanser
+
+<div style='font-size:16pt'>
+
+::: {#refs}
+:::
+
+</div>

@@ -1,10 +1,10 @@
 ---
 title: "stortingscrape"
-subtitle: "Analyser av stortingsdata `r emo::ji('monocle')`"
+subtitle: "`r emo::ji('monocle')` Analyser av stortingsdata `r emo::ji('european_castle')`"
 institute: "\\<martin.soyland@stv.uio.no\\>"
 author:
   - name: "Martin Søyland"
-    affiliation: University of Oslo
+    affiliation: Universitetet i Oslo
 date: today
 date-format: iso
 format: 
@@ -35,11 +35,12 @@ library(DT)
 quanteda_options("print_dfm_max_ndoc" = 10)
 ```
 
-# Følg presentasjonen
+# [Følg presentasjonen]{.midgreen}`r emo::ji("nerd")` 
+
+![](figs/qr_presentation2.png)
 
 
-
-# { data-background="figs/uio_page2.png" background-size="90%" background-position="50% 50%"}
+# { data-background="figs/uio_page2.png" background-size="80%" background-position="50% 50%"}
 
 # [Hva gjør jeg?]{.midgreen}`r emo::ji("mag")` { data-background="./figs/tad_fig2.png" data-background-size=65% data-background-position="50% 70%"}
 
@@ -99,7 +100,7 @@ dev.off()
 
 ::::
 
-## [Kildekode]{.midgreen} { data-background="figs/xml2.png" data-background-size=50% data-background-position="70% 50%" .smaller}
+## [Kildekode]{.midgreen} `r emo::ji("confused")` { data-background="figs/xml2.png" data-background-size=50% data-background-position="70% 50%" .smaller}
 
 
 . . .
@@ -127,13 +128,13 @@ get_session_mp_speech_activity <- function(sessionid = NA, mp_id = NA, good_mann
   tmp <- read_html(base)
 
   tmp2 <- data.frame(response_date      = tmp |> html_elements("representant_tale_aktivitet_oversikt > respons_dato_tid") |> html_text(),
-                     version            = tmp |> html_elements("representant_tale_aktivitet_oversikt > versjon") |> html_text(),
-                     session_id         = tmp |> html_elements("representant_tale_aktivitet_oversikt > sesjon_id") |> html_text(),
-                     agenda_case_number = tmp |> html_elements("representant_tale_aktivitet > dagsorden_sak_nummer") |> html_text(),
-                     meeting_id         = tmp |> html_elements("representant_tale_aktivitet > mote_id") |> html_text(),
-                     speech_start_time  = tmp |> html_elements("representant_tale_aktivitet > tale_start_tid") |> html_text(),
-                     speech_type        = tmp |> html_elements("representant_tale_aktivitet > tale_type") |> html_text(),
-                     speech_length_secs = tmp |> html_elements("representant_tale_aktivitet > tale_varighet_sekunder") |> html_text())
+                     version            = tmp |> html_elements("representant_tale_aktivitet_oversikt > versjon")          |> html_text(),
+                     session_id         = tmp |> html_elements("representant_tale_aktivitet_oversikt > sesjon_id")        |> html_text(),
+                     agenda_case_number = tmp |> html_elements("representant_tale_aktivitet > dagsorden_sak_nummer")      |> html_text(),
+                     meeting_id         = tmp |> html_elements("representant_tale_aktivitet > mote_id")                   |> html_text(),
+                     speech_start_time  = tmp |> html_elements("representant_tale_aktivitet > tale_start_tid")            |> html_text(),
+                     speech_type        = tmp |> html_elements("representant_tale_aktivitet > tale_type")                 |> html_text(),
+                     speech_length_secs = tmp |> html_elements("representant_tale_aktivitet > tale_varighet_sekunder")    |> html_text())
 
   Sys.sleep(good_manners)
 
@@ -179,12 +180,12 @@ jgs_activity |>
   kableExtra::kable_styling(font_size = "22")
 ```
 
-## 
+##  {.smaller}
 
 
 :::: {.columns}
 
-::: {.column width="50%" .fragment}
+::: {.column width="50%"}
 
 ```{r}
 #| eval: true
@@ -222,6 +223,20 @@ get_mp_pic("JGS", show_plot = T)
 
 
 ::::
+
+## {.smaller}
+
+```{r}
+#| eval: false
+#| echo: true
+get_mp_pic("EIGE", size = "stort", destfile = "einar.png")
+get_mp_pic("GHB", size = "stort", destfile = "gro.png")
+get_mp_pic("KÅWI", size = "stort", destfile = "kåre.png")
+```
+
+. . .
+
+![](figs/einar.png){width=30%} ![](figs/gro.png){width=30%} ![](figs/kåre.png){width=30%}
 
 # Preprosessering: `Talk of Norway`
 
